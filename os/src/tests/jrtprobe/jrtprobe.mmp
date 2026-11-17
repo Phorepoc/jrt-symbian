@@ -1,0 +1,19 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: Apache-2.0
+// jrtprobe -- loads JRT DLLs and looks up a JNI function through each one's jni_lookup (ordinal 1): "[jrtprobe]" lines
+#include <platform_paths.hrh>
+
+TARGET			jrtprobe.exe
+TARGETTYPE		exe
+UID				0x100039ce 0xE5510A01
+VENDORID		0
+CAPABILITY		ReadUserData WriteUserData NetworkServices LocalServices UserEnvironment ReadDeviceData WriteDeviceData SwEvent ProtServ PowerMgmt
+
+OS_LAYER_SYSTEMINCLUDE_SYMBIAN
+
+SOURCEPATH		.
+SOURCE			jrtprobe.cpp
+
+LIBRARY			euser.lib
+
+SMPSAFE

@@ -15,7 +15,9 @@ pin() { awk -v n="$1" -F'\t' '!/^#/ && $1 == n { print $2 "\t" $3 }' "$HERE/jrt.
 IFS="$(printf '\t')" read -r url commit <<EOF
 $(pin jrt)
 EOF
-src="$OUT/src"
+# under its package name: the pdk builds oss.FCL.sf.app.* code under the S60 product variant (bldvariant.hrh: the
+# platform R&D flags RD_SCALABLE_UI_V2, RD_TACTILE_FEEDBACK ...), as the 2010 build did for this app-layer package
+src="$OUT/oss.FCL.sf.app.JRT"
 [ -d "$src/.git" ] || git init -q "$src"
 if [ "$(git -C "$src" rev-parse HEAD 2>/dev/null)" != "$commit" ]; then
 	echo "fetch jrt @ ${commit%"${commit#????????}"}"

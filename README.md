@@ -15,11 +15,13 @@ We don't keep a copy of JRT. The recipes fetch the exact commit in `jrt.lock` an
 |---|---|
 | `jrt.lock` | the pins: JRT (commit of the Phorepoc fork of `oss.FCL.sf.app.JRT`) and `jni.h` (SHA-256) |
 | `recipes/prepare.sh` | run by the pdk before the components: `fetch.sh` + `generate.sh` (in the toolchain container) |
-| `recipes/fetch.sh` | JRT at its commit into `$PHOREPOC_BUILD/jrt/src`, `jni.h` into `$PHOREPOC_BUILD/jrt/epoc32/include` |
+| `recipes/fetch.sh` | JRT at its commit into `$PHOREPOC_BUILD/jrt/oss.FCL.sf.app.JRT`, `jni.h` into `$PHOREPOC_BUILD/jrt/epoc32/include` |
 | `recipes/generate.sh` | the header exports (`jrt_exports.py`) and an `.mmp` per component (`jrt_pro2mmp.py`) |
 | `recipes/jrt_exports.py` | what `sbs` did with each `exports.inf` |
 | `recipes/jrt_pro2mmp.py` | a small qmake stand-in: `.pro` -> `.mmp`, the JNI table (`lookup.cpp`), the javah headers from the sources |
-| `registry/components_jrt.py` | the components, merged into core's registry |
+| `recipes/jars.sh`, `recipes/build_jars.py` | **temporary**: the classes as one jar per DLL, compiled with a host JDK against `recipes/java/j9api` (compile-only stand-ins for the original VM's API) |
+| `registry/components_jrt.py` | the components (and their jars, into `Z:esource\java\jvm\lib\jrt`), merged into core's registry |
+| `os/src/tests/jrtprobe` | a load probe: `RLibrary::Load` + `jni_lookup` of `javautils.dll` and `eswt.dll` (`SSM_TEST=jrtprobe`) |
 
 ## Build
 
@@ -40,7 +42,11 @@ JRT itself is compiled unmodified. The build differs from Nokia's in these place
   build needs no Java compiler.
 - `jni.h` is the Android Open Source Project's (Apache-2.0) with two changes, both to match the ABI JRT's frozen `.def`
   files and eSWT expect: the C++ structs are named `JNIEnv_` / `JavaVM_`, and `jweak` is its own class.
-- eSWT is built with `RD_SCALABLE_UI_V2` and `RD_TACTILE_FEEDBACK` (the touch platform it was written for).
+- The tree is fetched under its package name (`oss.FCL.sf.app.JRT`), so the pdk builds it under the S60 product variant
+  (`bldvariant.hrh`, with the platform's R&D flags such as `RD_SCALABLE_UI_V2` and `RD_TACTILE_FEEDBACK`), as the 2010
+  build did for this app-layer package. The JNI tables honour the `#if` blocks against the same flags.
+- The jars (temporary) are compiled against the JDK 8 API, not a CLDC library: files that need CLDC are left out and
+  listed in `excluded.txt`. The VM's own class library replaces this step.
 
 ## Licences
 

@@ -5,7 +5,7 @@ r"""components_jrt -- this layer's components: Nokia's Java runtime (JRT, the Av
 eSWT, merged into core's registry when this repository is built (PHOREPOC_ADAPTATIONS=...:<jrt-symbian>, see the pdk's
 tools/emitter/paths.py).
 
-The JRT source is not in this repository: recipes/prepare.sh fetches it at its pinned commit to $PHOREPOC_BUILD/jrt/src
+The JRT source is not in this repository: recipes/prepare.sh fetches it at its pinned commit to $PHOREPOC_BUILD/jrt/oss.FCL.sf.app.JRT
 and writes the .mmp files qmake would have written next to each .pro (recipes/jrt_pro2mmp.py), so every `mmp` below is
 in the build tree. eSWT's API facade and physics have real .mmp files in the tree and are built from those.
 
@@ -13,9 +13,9 @@ The virtual machine is not here. The DLLs carry the natives and the JNI name tab
 that runs them comes from Catalogue."""
 import os
 
-from paths import BUILD, SYMBIAN
+from paths import BUILD, OS_ROOT, SYMBIAN
 
-JRT = os.path.join(BUILD, "jrt/src")
+JRT = os.path.join(BUILD, "jrt/oss.FCL.sf.app.JRT")
 
 
 def _gen(rel: str, target: str) -> str:
@@ -50,6 +50,8 @@ COMPONENTS = {
     "javalcdui": dict(mmp=_gen("javauis/lcdui_akn/javalcdui/build", "javalcdui")),
     "eswt": dict(mmp=_gen("javauis/eswt_akn/org.eclipse.ercp.swt.s60/native/build", "eswt")),
     "eswtdirectcontent": dict(mmp=_gen("javauis/eswt_akn/eswtdirectcontent/build", "eswtdirectcontent")),
+    # media keys for eSWT (eswtapifacade: CJavaRemConManager)
+    "javaremconobserver": dict(mmp=_gen("javauis/remconobserver_akn/build", "javaremconobserver")),
     "eswtapifacade": dict(mmp=os.path.join(JRT, "javauis/eswt_akn/eswtapifacade/group/eswtapifacade.mmp")),
     "eswtphysics": dict(mmp=os.path.join(JRT, "javauis/eswt_akn/eswtphysics/group/eswtphysics.mmp")),
 }
@@ -62,12 +64,17 @@ for _c in COMPONENTS.values():
     # last, as core does for its own components (components.API_REF_LAST)
     _c["x32_flags"] = ["-idirafter", os.path.join(SYMBIAN, "symbian-2010/oss.API_REF.Public_API/epoc32/include")]
 
-# eSWT is written for the touch platform: the S^3 product variant defines RD_SCALABLE_UI_V2 (long tap, stylus popup)
-# and RD_TACTILE_FEEDBACK; eswtdirectcontent includes the Avkon-era MMAPI's direct-content interfaces
-for _k in ("eswt", "eswtdirectcontent", "eswtapifacade"):
-    COMPONENTS[_k]["defs"] = ["RD_SCALABLE_UI_V2", "RD_TACTILE_FEEDBACK"]
+# eswtdirectcontent includes the Avkon-era MMAPI's direct-content interfaces
 COMPONENTS["eswtdirectcontent"]["x32_flags"] = COMPONENTS["eswtdirectcontent"]["x32_flags"] + [
     "-I", os.path.join(JRT, "javauis/mmapi_akn/baseline/inc")]
-# swtbrowserconnectionmanager.cpp uses KFeatureIdProtocolWlan without including featureinfo.h (a platform header that
-# included it then)
-COMPONENTS["eswt"]["x32_flags"] = COMPONENTS["eswt"]["x32_flags"] + ["-include", "featureinfo.h"]
+
+# The classes, one jar per DLL (recipes/jars.sh, TEMPORARY until P2): Z:\resource\java\jvm\lib\jrt\<dll>.jar, where the
+# original build kept the class-container manifests (.odc). Only the jars a build made (no JDK, no jars).
+JARS = os.path.join(BUILD, "jrt/jars")
+for _k, _c in COMPONENTS.items():
+    for _jar in [_k] + (["jrt-misc"] if _k == "javautils" else []):
+        if os.path.isfile(os.path.join(JARS, _jar + ".jar")):
+            _c.setdefault("rom_data", []).append(f"resource\java\jvm\lib\jrt\{_jar}.jar=.jrt/jars/{_jar}.jar")
+
+# the load probe (a ROM built with SSM_TEST=jrtprobe starts it): RLibrary::Load + jni_lookup of javautils.dll and eswt.dll
+COMPONENTS["jrtprobe"] = dict(mmp=os.path.join(OS_ROOT, "src/tests/jrtprobe/jrtprobe.mmp"), test=True)

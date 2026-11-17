@@ -61,6 +61,7 @@ COMPONENTS = [
     "javacommons/connectionmanager/build/javaconnectionmanager.pro",
     "javauis/eswt_akn/org.eclipse.ercp.swt.s60/native/build/eswt.pro",
     "javauis/eswt_akn/eswtdirectcontent/build/eswtdirectcontent.pro",
+    "javauis/remconobserver_akn/build/javaremconobserver.pro",
 ]
 
 
@@ -143,11 +144,41 @@ class Pro:
         if os.path.isfile(p):
             self.run_file(p)
 
+
+    def pro_ifdefs(self, text: str) -> str:
+        """Some .pro files wrap LIBS lines in C-preprocessor #ifdef blocks (javalcdui: `-llibegl -llibglesv1_cm` under
+        #ifdef RD_JAVA_NGA_ENABLED, after a LIBS list). To qmake `#` starts a comment, so the lines in between belong to
+        the open LIBS continuation. Honoured here against PROJECT_DEFINES: an active block's `-l` lines become
+        `LIBS += ...`, an inactive block is dropped."""
+        out, stack = [], []
+        for ln in text.splitlines():
+            m = re.match(r"\s*#\s*(ifdef|ifndef|else|endif)\b\s*(\w*)", ln)
+            if m:
+                kw, name = m.groups()
+                if kw in ("ifdef", "ifndef"):
+                    on = (name in self.v.get("PROJECT_DEFINES", [])) == (kw == "ifdef")
+                    stack.append(on)
+                elif kw == "else" and stack:
+                    stack[-1] = not stack[-1]
+                elif kw == "endif" and stack:
+                    stack.pop()
+                out.append("")
+                continue
+            if stack:
+                if not all(stack):
+                    out.append("")
+                    continue
+                if re.match(r"\s*-l\S", ln):
+                    ln = "LIBS += " + ln.strip().rstrip("\\").strip()
+            out.append(ln)
+        return "\n".join(out) + "\n"
+
     # ---- the interpreter: lines -> blocks
     def run_file(self, path: str):
         save = getattr(self, "cur_dir", self.pwd)
         self.cur_dir = os.path.dirname(path)
         text = open(path, encoding="latin-1").read()
+        text = self.pro_ifdefs(text)
         text = re.sub(r"\\[ \t]*\r?\n", " ", text)
         lines = [re.sub(r"(^|\s)#.*$", "", ln).strip() for ln in text.splitlines()]
         toks = []
@@ -296,6 +327,8 @@ def convert(jrt: str, pro_path: str, javah: str | None) -> dict:
         # no JNI table, but its sources may still include a javah header for a class's constants
         javah_standin(jrt, gen, srcs, [])
     if is_java:
+        ACTIVE_DEFINES.clear()
+        ACTIVE_DEFINES.update(set(defines) | PLATFORM_DEFINES | {"__SYMBIAN32__", "J9EPOC32", "RD_JAVA_OMJ_FSERVER"})
         jni = write_lookup(p, gen, javah, srcs, jrt)
         out += ["SOURCEPATH phorepoc_gen", "SOURCE lookup.cpp", "SOURCE jxe.c"]
     for lib in libs:
@@ -425,6 +458,57 @@ def javah_standin(jrt: str, gen: str, srcs: list[str], defs: list[tuple[str, str
     return written
 
 
+
+# the defines a component is compiled with (its MACROs + the platform's, PLATFORM_DEFINES), for active_text()
+ACTIVE_DEFINES: set[str] = set()
+PLATFORM_DEFINES: set[str] = set()
+
+
+def _cond(expr: str, defs: set[str]) -> bool:
+    """A preprocessor condition over `defined X` / `!defined X` / && / || / 0 / 1; anything else counts as true
+    (a value test we cannot evaluate: keep the code, a link then names it)."""
+    e = re.sub(r"defined\s*\(\s*(\w+)\s*\)|defined\s+(\w+)",
+               lambda m: "1" if (m.group(1) or m.group(2)) in defs else "0", expr)
+    e = e.replace("&&", " and ").replace("||", " or ").replace("!", " not ")
+    if re.search(r"[A-Za-z_]\w*", re.sub(r"\b(and|or|not)\b", "", e)):
+        return True
+    try:
+        return bool(eval(e, {"__builtins__": {}}))   # noqa: S307 -- 0/1 and boolean operators only (checked above)
+    except Exception:                               # noqa: BLE001
+        return True
+
+
+def active_text(text: str, defs: set[str]) -> str:
+    """The text with the #if/#ifdef/#ifndef/#elif/#else blocks that are off for `defs` blanked out, so the JNI table
+    lists only the functions the compiler really sees (CMIDTactileFeedback.cpp: all under #ifdef RD_TACTILE_FEEDBACK)."""
+    out, stack = [], []          # stack of (this branch on, some branch taken, parent on)
+    on = True
+    for ln in text.splitlines(True):
+        m = re.match(r"\s*#\s*(ifdef|ifndef|if|elif|else|endif)\b(.*)", ln)
+        if m:
+            kw, rest = m.group(1), m.group(2).split("//")[0].strip()
+            if kw in ("ifdef", "ifndef", "if"):
+                c = (rest.split()[0] in defs) if kw == "ifdef" else \
+                    (rest.split()[0] not in defs) if kw == "ifndef" else _cond(rest, defs)
+                stack.append((on, c))
+                on = on and c
+            elif kw == "elif" and stack:
+                parent, taken = stack[-1]
+                c = not taken and _cond(rest, defs)
+                stack[-1] = (parent, taken or c)
+                on = parent and c
+            elif kw == "else" and stack:
+                parent, taken = stack[-1]
+                on = parent and not taken
+                stack[-1] = (parent, True)
+            elif kw == "endif" and stack:
+                on = stack.pop()[0]
+            out.append("\n")
+            continue
+        out.append(ln if on else "\n")
+    return "".join(out)
+
+
 def write_lookup(p: Pro, gen: str, javah: str | None, srcs: list[str], jrt: str) -> list[str]:
     classes = java_classes_of(p.pwd)
     headers, fns, decls = [], [], []
@@ -445,7 +529,7 @@ def write_lookup(p: Pro, gen: str, javah: str | None, srcs: list[str], jrt: str)
         for s in srcs:
             if os.path.isfile(s):
                 defs += [(re.sub(r"\s+", " ", r), n, re.sub(r"\s+", " ", a))
-                         for r, n, a in RE_JNIDEF.findall(open(s, encoding="latin-1").read())]
+                         for r, n, a in RE_JNIDEF.findall(active_text(open(s, encoding="latin-1").read(), ACTIVE_DEFINES))]
         javah_standin(jrt, gen, srcs, defs)
         fns = [n for _, n, _ in defs]
         # C linkage, so a plain declaration names the same symbol whatever the real signature
@@ -475,9 +559,16 @@ def main():
     ap.add_argument("--jrt", required=True, help="the JRT tree (oss.FCL.sf.app.JRT at the commit in jrt.lock)")
     ap.add_argument("--javah", default=None, help="javah headers of the compiled classes; default: the stand-in from the sources")
     ap.add_argument("--sysinc", action="append", default=[], help="an extra SYSTEMINCLUDE dir for every mmp")
+    ap.add_argument("--platform-hrh", action="append", default=[],
+                    help="a platform .hrh whose #defines every component is compiled with (bldcodeline.hrh)")
     ap.add_argument("pros", nargs="*")
     a = ap.parse_args()
     SYSINC.extend(os.path.abspath(d) for d in a.sysinc)
+    for h in a.platform_hrh:
+        for m in re.finditer(r"^\s*#define\s+(\w+)", open(h, encoding="latin-1").read(), re.M):
+            PLATFORM_DEFINES.add(m.group(1))
+        for m in re.finditer(r"^\s*#undef\s+(\w+)", open(h, encoding="latin-1").read(), re.M):
+            PLATFORM_DEFINES.discard(m.group(1))
     pros = a.pros or [os.path.join(a.jrt, x) for x in COMPONENTS]
     bad = 0
     for pro in pros:

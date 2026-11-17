@@ -9,5 +9,5 @@ set -eu
 : "${PHOREPOC_BUILD:?}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$PHOREPOC_BUILD/jrt"
-python3 "$HERE/recipes/jrt_exports.py" --jrt "$OUT/src" --out "$OUT/epoc32"
-python3 "$HERE/recipes/jrt_pro2mmp.py" --jrt "$OUT/src" --sysinc "$OUT/epoc32/include"
+python3 "$HERE/recipes/jrt_exports.py" --jrt "$OUT/oss.FCL.sf.app.JRT" --out "$OUT/epoc32"
+python3 "$HERE/recipes/jrt_pro2mmp.py" --jrt "$OUT/oss.FCL.sf.app.JRT" --sysinc "$OUT/epoc32/include" --platform-hrh "$PHOREPOC_BUILD/epoc32/include/bldcodeline.hrh"
