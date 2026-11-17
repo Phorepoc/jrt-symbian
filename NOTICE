@@ -1,0 +1,22 @@
+jrt-symbian: Nokia's Java runtime and eSWT for Phorepoc
+Copyright The Phorepoc Authors (see AUTHORS)
+
+Phorepoc was founded by Kyriakos Bompotis.
+
+The recipes and the registry in this repository are licensed under the Apache License 2.0 (LICENSE).
+
+Not part of this repository, fetched at build time (recipes/fetch.sh, pinned in jrt.lock):
+
+- JRT, the Java runtime of the Symbian platform (oss.FCL.sf.app.JRT, the Avkon-era tree, version 2.1.24), including
+  eSWT. Copyright (c) Nokia Corporation and/or its subsidiary(-ies). Made available under the Eclipse Public License
+  v1.0 (LICENSES/EPL-1.0.txt). Every source file keeps its own licence header. The build adds generated files
+  next to the sources (.mmp files, JNI tables, header stand-ins, header exports) and changes nothing in JRT's code,
+  except removing the Qt-era and STLport 5 defines from the generated build_defines.hrh.
+- jni.h, the JNI interface header, copyright (C) 2006 The Android Open Source Project, licensed under the Apache
+  License 2.0. Modified at fetch time (recipes/fetch.sh): the C++ structs are renamed JNIEnv_ and JavaVM_, and jweak
+  is declared as a class derived from _jobject.
+
+The binaries built from JRT are distributed under the EPL-1.0. Its source is available from the commit named in
+jrt.lock.
+
+Thanks to Nokia and the Symbian Foundation for releasing the platform.

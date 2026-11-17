@@ -1,0 +1,7 @@
+# what recipes/fetch.sh fetches, at these pins (name, source, pin)
+# JRT: the Java runtime of the 2010 Symbian release (EPL-1.0), the Avkon-era tree (v2.1.24, kit 201019), from the
+# Phorepoc fork of the SymbianSource package. Later commits on its master replace the Avkon UI with Qt.
+jrt	https://github.com/Phorepoc/oss.FCL.sf.app.JRT.git	1986528dd0438c6243e7d4bc5af004500f725a67
+# jni.h: the JNI interface header (Apache-2.0, the Android Open Source Project), by SHA-256. JRT's natives are JNI;
+# the original build took the header from the VM vendor's kit.
+jni.h	https://android.googlesource.com/platform/libnativehelper/+/refs/tags/android-14.0.0_r1/include_jni/jni.h?format=TEXT	c88ce2cb6ce10378cd4c706a3a2ad017794aedb9314ddcc341e39b470cdb601a
