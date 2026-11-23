@@ -7,7 +7,7 @@ Avkon, RMS, the file and generic-connection protocols, security, and eSWT.
 The virtual machine is **not** here. Every Java DLL carries its natives and a JNI name table (`jni_lookup`, ordinal 1),
 and a VM installed from Catalogue runs them: the same image can then take either an open VM or the owner's own.
 
-We don't keep a copy of JRT. The recipes fetch the exact commit in `jrt.lock` and generate the build files.
+This repository does not keep a copy of JRT. The recipes fetch the exact commit in `jrt.lock` and generate the build files.
 
 ## Layout
 
@@ -51,5 +51,5 @@ JRT itself is compiled unmodified. The build differs from Nokia's in these place
 ## Licences
 
 JRT and eSWT: Eclipse Public License 1.0 (`LICENSES/EPL-1.0.txt`), copyright Nokia Corporation and/or its
-subsidiaries, as their file headers say. `jni.h`: Apache-2.0, the Android Open Source Project. Our recipes and
+subsidiaries, as their file headers say. `jni.h`: Apache-2.0, the Android Open Source Project. Phorepoc's recipes and
 registry: Apache-2.0 (`LICENSE`). See `NOTICE`.
